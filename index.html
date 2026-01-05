@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase Number Input</title>
+    <script src="https://www.gstatic.com/firebasejs/9.1.2/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.1.2/firebase-database.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        input[type="number"] { padding: 8px; margin-right: 5px; }
+        button { padding: 8px 12px; }
+    </style>
+</head>
+<body>
+
+    <h1>Enter a Number</h1>
+    <input type="number" id="numberInput" placeholder="Enter a number">
+    <button onclick="saveData()">Save Number</button>
+    <button onclick="fetchData()">Fetch Last Number</button>
+
+    <h2 id="output"></h2>
+
+    <script>
+        // Your web app's Firebase configuration
+        const firebaseConfig = {
+              apiKey: "AIzaSyACnC5jlmAzfAFikwAxLgIKpf5lWn7r4_k",
+  authDomain: "save-4cb6e.firebaseapp.com",
+  databaseURL: "https://save-4cb6e-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "save-4cb6e",
+  storageBucket: "save-4cb6e.firebasestorage.app",
+  messagingSenderId: "881357903306",
+  appId: "1:881357903306:web:f930af59d6cd26f6dd2b33",
+  measurementId: "G-FN3FL303N4"
+        };
+
+        // Initialize Firebase
+        const app = firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        // Function to save data
+        function saveData() {
+            const number = document.getElementById('numberInput').value;
+            if (number) {
+                firebase.database().ref('numbers/').push({ value: number })
+                    .then(() => {
+                        console.log('Number saved successfully!');
+                        document.getElementById('numberInput').value = ''; // Clear input
+                    })
+                    .catch((error) => {
+                        console.error('Error saving number: ', error);
+                    });
+            } else {
+                alert('Please enter a number.');
+            }
+        }
+
+        // Function to fetch data
+        function fetchData() {
+            firebase.database().ref('numbers/').limitToLast(1).once('value')
+                .then((snapshot) => {
+                    const data = snapshot.val();
+                    const lastNumber = data ? Object.values(data)[0].value : 'No number found.';
+                    document.getElementById('output').innerText = `Last saved number: ${lastNumber}`;
+                })
+                .catch((error) => {
+                    console.error('Error fetching number: ', error);
+                });
+        }
+    </script>
+
+</body>
+</html>
