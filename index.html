@@ -1,99 +1,112 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Save/Load Number to Firebase</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      max-width: 600px;
-      margin: 50px auto;
-      text-align: center;
-    }
-    input, button {
-      padding: 10px;
-      margin: 10px;
-      font-size: 16px;
-    }
-    #display {
-      font-size: 24px;
-      margin: 30px;
-      min-height: 30px;
-    }
-  </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Protected Items</title>
 </head>
 <body>
-  <h1>Firebase Realtime Database - Save/Load Number</h1>
-  
-  <input type="number" id="numberInput" placeholder="Enter a number" />
-  <br>
-  <button onclick="saveNumber()">Save</button>
-  <button onclick="loadNumber()">Load</button>
-  
-  <div id="display">Loaded number will appear here</div>
+  <h1>Items (login required)</h1>
 
-  <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script>
+  <div>
+    <h3>Login</h3>
+    <input id="email" placeholder="email" />
+    <input id="password" type="password" placeholder="password" />
+    <button id="loginBtn">Login</button>
+    <button id="logoutBtn">Logout</button>
+    <p id="status"></p>
+  </div>
 
-  <script>
-    // Your Firebase configuration
+  <div>
+    <h3>Add item</h3>
+    <input id="itemName" placeholder="item name" />
+    <button id="addBtn">Add</button>
+  </div>
+
+  <pre id="out"></pre>
+
+  <script type="module">
+    // 1) Import Firebase (v9 modular)
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import {
+      getAuth,
+      signInWithEmailAndPassword,
+      signOut,
+      onAuthStateChanged
+    } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+    import {
+      getFirestore,
+      collection,
+      addDoc,
+      getDocs,
+      query,
+      orderBy
+    } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    // 2) Your Firebase config here
     const firebaseConfig = {
       apiKey: "AIzaSyACnC5jlmAzfAFikwAxLgIKpf5lWn7r4_k",
       authDomain: "save-4cb6e.firebaseapp.com",
-      databaseURL: "https://save-4cb6e-default-rtdb.asia-southeast1.firebasedatabase.app",
       projectId: "save-4cb6e",
-      storageBucket: "save-4cb6e.appspot.com",
-      messagingSenderId: "881357903306",
       appId: "1:881357903306:web:f930af59d6cd26f6dd2b33",
-      measurementId: "G-FN3FL303N4"
     };
 
-    // Initialize Firebase
-    firebase.initializeApp(firebaseConfig);
-    const database = firebase.database();
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
 
-    // Reference to a single value in the database (you can change the path)
-    const numberRef = database.ref('myNumber');
+    const statusEl = document.getElementById("status");
+    const outEl = document.getElementById("out");
 
-    function saveNumber() {
-      const input = document.getElementById('numberInput');
-      const value = parseFloat(input.value);
+    async function loadItems() {
+      // Firestore rules will block this if not logged in
+      const q = query(collection(db, "items"), orderBy("createdAt", "desc"));
+      const snap = await getDocs(q);
+      const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      outEl.textContent = JSON.stringify(items, null, 2);
+    }
 
-      if (isNaN(value)) {
-        alert('Please enter a valid number');
-        return;
+    document.getElementById("loginBtn").onclick = async () => {
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+      } catch (e) {
+        statusEl.textContent = "Login failed: " + e.message;
       }
+    };
 
-      numberRef.set(value)
-        .then(() => {
-          alert('Number saved successfully!');
-          input.value = '';
-          loadNumber(); // optional: update display immediately
-        })
-        .catch((error) => {
-          alert('Error saving: ' + error.message);
+    document.getElementById("logoutBtn").onclick = async () => {
+      await signOut(auth);
+    };
+
+    document.getElementById("addBtn").onclick = async () => {
+      try {
+        const name = document.getElementById("itemName").value.trim();
+        if (!name) return;
+
+        await addDoc(collection(db, "items"), {
+          name,
+          createdAt: Date.now(),
+          ownerUid: auth.currentUser.uid
         });
-    }
 
-    function loadNumber() {
-      numberRef.once('value')
-        .then((snapshot) => {
-          if (snapshot.exists()) {
-            const value = snapshot.val();
-            document.getElementById('display').textContent = 'Loaded number: ' + value;
-          } else {
-            document.getElementById('display').textContent = 'No number saved yet';
-          }
-        })
-        .catch((error) => {
-          alert('Error loading: ' + error.message);
-        });
-    }
+        await loadItems();
+      } catch (e) {
+        statusEl.textContent = "Add failed: " + e.message;
+      }
+    };
 
-    // Optional: Auto-load when page opens
-    window.onload = loadNumber;
+    onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        statusEl.textContent = `Logged in as ${user.email}`;
+        try { await loadItems(); } catch (e) { statusEl.textContent = e.message; }
+      } else {
+        statusEl.textContent = "Not logged in";
+        outEl.textContent = "";
+      }
+    });
   </script>
 </body>
 </html>
